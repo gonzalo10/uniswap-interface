@@ -1,25 +1,39 @@
-import logo from './logo.svg';
-import './App.css';
+import { useState } from 'react'
+import Web3 from 'web3'
+import { JsonRpcProvider, Web3Provider } from '@ethersproject/providers'
+import BurnerProvider from 'burner-provider'
 
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+import './App.css'
+import { useEffect } from 'react'
+
+function getProvider(localProvider) {
+	let burnerConfig = {}
+	burnerConfig.rpcUrl = localProvider.connection.url
+	return new Web3Provider(new BurnerProvider(burnerConfig))
 }
 
-export default App;
+function App() {
+	const [tokenListURI, setTokenListURI] = useState(
+		'https://gateway.ipfs.io/ipns/tokens.uniswap.org'
+	)
+
+	const localProviderUrl = 'http://localhost:8545'
+	const localProvider = new JsonRpcProvider(localProviderUrl)
+
+	async function loadBlockchainData() {
+		const web3 = new Web3('http://localhost:8545')
+		const accounts = await web3.eth.getAccounts()
+		const userAccount = accounts[0]
+		const userProvider = getProvider(localProvider)
+		const balance = await userProvider.getBalance(userAccount)
+		console.log(accounts[0], balance)
+	}
+	useEffect(() => {
+		loadBlockchainData()
+	}, [])
+
+	console.log({ tokenListURI })
+	return <div className='App'></div>
+}
+
+export default App
