@@ -5,6 +5,7 @@ import BurnerProvider from 'burner-provider'
 
 import './App.css'
 import { useEffect } from 'react'
+import { formatEther } from '@ethersproject/units'
 
 function getProvider(localProvider) {
 	let burnerConfig = {}
@@ -26,7 +27,9 @@ function App() {
 		const userAccount = accounts[0]
 		const userProvider = getProvider(localProvider)
 		const balance = await userProvider.getBalance(userAccount)
-		console.log(accounts[0], balance)
+		const etherBalance = formatEther(balance)
+		const parsedBalance = parseFloat(etherBalance)
+		console.log(accounts[0], parsedBalance)
 	}
 	useEffect(() => {
 		loadBlockchainData()
