@@ -1,17 +1,7 @@
-import { useState, useCallback, useMemo } from 'react'
-import Web3 from 'web3'
+import { useState, useCallback } from 'react'
 import { parseUnits } from '@ethersproject/units'
 import { JsonRpcProvider, Web3Provider } from '@ethersproject/providers'
-import BurnerProvider from 'burner-provider'
-import {
-	ChainId,
-	Token,
-	WETH,
-	Fetcher,
-	Trade,
-	TokenAmount,
-	Percent
-} from '@uniswap/sdk'
+import { Percent } from '@uniswap/sdk'
 import Web3Modal from 'web3modal'
 import { ethers } from 'ethers'
 import WalletConnectProvider from '@walletconnect/web3-provider'
@@ -20,170 +10,18 @@ import { useEffect } from 'react'
 import { formatEther, formatUnits } from '@ethersproject/units'
 import { Box, Button, Heading, Input, Select, Spinner } from '@chakra-ui/react'
 import { abi as IUniswapV2Router02ABI } from '@uniswap/v2-periphery/build/IUniswapV2Router02.json'
-
-export const INFURA_ID = '460f40a260564ac4a4f4b3fffb032dad'
-
-const erc20Abi = [
-	'function balanceOf(address owner) view returns (uint256)',
-	'function approve(address _spender, uint256 _value) public returns (bool success)',
-	'function allowance(address _owner, address _spender) public view returns (uint256 remaining)'
-]
-
-const useUserProvider = (injectedProvider, localProvider) =>
-	useMemo(() => {
-		if (injectedProvider) {
-			return injectedProvider
-		}
-		if (!localProvider) return undefined
-
-		let burnerConfig = {}
-
-		if (window.location.pathname) {
-			if (window.location.pathname.indexOf('/pk') >= 0) {
-				let incomingPK = window.location.hash.replace('#', '')
-				let rawPK
-				if (incomingPK.length === 64 || incomingPK.length === 66) {
-					rawPK = incomingPK
-					burnerConfig.privateKey = rawPK
-					window.history.pushState({}, '', '/')
-					let currentPrivateKey = window.localStorage.getItem('metaPrivateKey')
-					if (currentPrivateKey && currentPrivateKey !== rawPK) {
-						window.localStorage.setItem(
-							'metaPrivateKey_backup' + Date.now(),
-							currentPrivateKey
-						)
-					}
-					window.localStorage.setItem('metaPrivateKey', rawPK)
-				}
-			}
-		}
-
-		if (localProvider.connection && localProvider.connection.url) {
-			burnerConfig.rpcUrl = localProvider.connection.url
-			return new Web3Provider(new BurnerProvider(burnerConfig))
-		} else {
-			// eslint-disable-next-line no-underscore-dangle
-			const networkName = localProvider._network && localProvider._network.name
-			burnerConfig.rpcUrl = `https://${
-				networkName || 'mainnet'
-			}.infura.io/v3/${INFURA_ID}`
-			return new Web3Provider(new BurnerProvider(burnerConfig))
-		}
-	}, [injectedProvider, localProvider])
-
-function tokenListToObject(array) {
-	return array.reduce((obj, item) => {
-		obj[item.symbol] = new Token(
-			item.chainId,
-			item.address,
-			item.decimals,
-			item.symbol,
-			item.name
-		)
-		return obj
-	}, {})
-}
-const getTokenList = async (tokenListURI) => {
-	try {
-		let tokenList = await fetch(tokenListURI)
-		let tokenListJson = await tokenList.json()
-		let filteredTokens = tokenListJson.tokens.filter(function (t) {
-			return t.chainId === ChainId.MAINNET
-		})
-		let ethToken = WETH[ChainId.MAINNET]
-		ethToken.name = 'Ethereum'
-		ethToken.symbol = 'ETH'
-		ethToken.logoURI =
-			'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png'
-		let _tokenList = [ethToken, ...filteredTokens]
-		return _tokenList
-	} catch (e) {
-		console.error(e)
-	}
-}
-
-const getTrades = async (
-	tokenIn,
-	tokenOut,
-	amountIn,
-	tokenList,
-	userProvider,
-	tokens,
-	setAmountOut,
-	setTrades
-) => {
-	if (tokenIn && tokenOut && amountIn) {
-		let pairs = (arr) =>
-			arr.map((v, i) => arr.slice(i + 1).map((w) => [v, w])).flat()
-
-		let baseTokens = tokenList
-			.filter(function (t) {
-				return [
-					'DAI',
-					'USDC',
-					'USDT',
-					'COMP',
-					'ETH',
-					'MKR',
-					'LINK',
-					tokenIn,
-					tokenOut
-				].includes(t.symbol)
-			})
-			.map((el) => {
-				return new Token(
-					el.chainId,
-					el.address,
-					el.decimals,
-					el.symbol,
-					el.name
-				)
-			})
-
-		let listOfPairwiseTokens = pairs(baseTokens)
-		const getPairs = async (list) => {
-			let listOfPromises = list.map((item) =>
-				Fetcher.fetchPairData(item[0], item[1], userProvider)
-			)
-			return Promise.all(listOfPromises.map((p) => p.catch(() => undefined)))
-		}
-
-		let listOfPairs = await getPairs(listOfPairwiseTokens)
-
-		const bestTrade = Trade.bestTradeExactIn(
-			listOfPairs.filter((item) => item),
-			new TokenAmount(
-				tokens[tokenIn],
-				parseUnits(amountIn.toString(), tokens[tokenIn].decimals)
-			),
-			tokens[tokenOut]
-		)
-		if (bestTrade[0]) {
-			setAmountOut(bestTrade[0].outputAmount.toSignificant(6))
-		} else {
-			setAmountOut()
-		}
-
-		setTrades(bestTrade)
-	}
-}
-let defaultToken = 'ETH'
-let defaultTokenOut = 'DAI'
-export const ROUTER_ADDRESS = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
-
-const makeCall = async (callName, contract, args, metadata = {}) => {
-	if (contract[callName]) {
-		let result
-		if (args) {
-			result = await contract[callName](...args, metadata)
-		} else {
-			result = await contract[callName]()
-		}
-		return result
-	} else {
-		console.log('no call of that name!')
-	}
-}
+import {
+	defaultToken,
+	defaultTokenOut,
+	erc20Abi,
+	getTokenList,
+	getTrades,
+	INFURA_ID,
+	makeCall,
+	ROUTER_ADDRESS,
+	tokenListToObject
+} from './helpers'
+import { useUserProvider } from './hooks'
 
 let defaultTimeLimit = 60 * 10
 let defaultSlippage = '0.5'
@@ -228,11 +66,6 @@ function App() {
 		setTokenList(_tokenList)
 		setTokens(tokenListToObject(_tokenList))
 	}
-	useEffect(() => {
-		if (trades && trades[0]) {
-			setAmountOutMin(trades[0].minimumAmountOut(slippageTolerance))
-		}
-	}, [slippageTolerance, amountIn, amountOut, trades])
 
 	let signer = userProvider.getSigner()
 	let routerContract = new ethers.Contract(
@@ -283,6 +116,30 @@ function App() {
 	useEffect(() => {
 		loadBlockchainData()
 	}, [injectedProvider])
+
+	useEffect(() => {
+		loadBlockchainData()
+	}, [])
+
+	useEffect(() => {
+		getTrades(
+			tokenIn,
+			tokenOut,
+			amountIn,
+			tokenList,
+			userProvider,
+			tokens,
+			setAmountOut,
+			setTrades
+		)
+		getAccountInfo()
+	}, [tokenIn, tokenOut, amountIn, amountOut])
+
+	useEffect(() => {
+		if (trades && trades[0]) {
+			setAmountOutMin(trades[0].minimumAmountOut(slippageTolerance))
+		}
+	}, [slippageTolerance, amountIn, amountOut, trades])
 
 	const getBalance = async (_token, _account, _contract) => {
 		let newBalance
@@ -399,24 +256,6 @@ function App() {
 			})
 		}
 	}
-
-	useEffect(() => {
-		loadBlockchainData()
-	}, [])
-
-	useEffect(() => {
-		getTrades(
-			tokenIn,
-			tokenOut,
-			amountIn,
-			tokenList,
-			userProvider,
-			tokens,
-			setAmountOut,
-			setTrades
-		)
-		getAccountInfo()
-	}, [tokenIn, tokenOut, amountIn, amountOut])
 
 	let inputIsToken = tokenIn !== 'ETH'
 	let insufficientBalance = balanceIn
