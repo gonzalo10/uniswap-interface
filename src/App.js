@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import Web3 from 'web3'
 import { parseUnits } from '@ethersproject/units'
 import { JsonRpcProvider, Web3Provider } from '@ethersproject/providers'
@@ -12,16 +12,64 @@ import {
 	TokenAmount,
 	Percent
 } from '@uniswap/sdk'
+import Web3Modal from 'web3modal'
+import { ethers } from 'ethers'
+import WalletConnectProvider from '@walletconnect/web3-provider'
 
 import { useEffect } from 'react'
-import { formatEther } from '@ethersproject/units'
-import { Box, Heading, Input, Select } from '@chakra-ui/react'
+import { formatEther, formatUnits } from '@ethersproject/units'
+import { Box, Button, Heading, Input, Select, Spinner } from '@chakra-ui/react'
 
-function getProvider(localProvider) {
-	let burnerConfig = {}
-	burnerConfig.rpcUrl = localProvider.connection.url
-	return new Web3Provider(new BurnerProvider(burnerConfig))
-}
+export const INFURA_ID = '460f40a260564ac4a4f4b3fffb032dad'
+
+const erc20Abi = [
+	'function balanceOf(address owner) view returns (uint256)',
+	'function approve(address _spender, uint256 _value) public returns (bool success)',
+	'function allowance(address _owner, address _spender) public view returns (uint256 remaining)'
+]
+
+const useUserProvider = (injectedProvider, localProvider) =>
+	useMemo(() => {
+		if (injectedProvider) {
+			return injectedProvider
+		}
+		if (!localProvider) return undefined
+
+		let burnerConfig = {}
+
+		if (window.location.pathname) {
+			if (window.location.pathname.indexOf('/pk') >= 0) {
+				let incomingPK = window.location.hash.replace('#', '')
+				let rawPK
+				if (incomingPK.length === 64 || incomingPK.length === 66) {
+					rawPK = incomingPK
+					burnerConfig.privateKey = rawPK
+					window.history.pushState({}, '', '/')
+					let currentPrivateKey = window.localStorage.getItem('metaPrivateKey')
+					if (currentPrivateKey && currentPrivateKey !== rawPK) {
+						window.localStorage.setItem(
+							'metaPrivateKey_backup' + Date.now(),
+							currentPrivateKey
+						)
+					}
+					window.localStorage.setItem('metaPrivateKey', rawPK)
+				}
+			}
+		}
+
+		if (localProvider.connection && localProvider.connection.url) {
+			burnerConfig.rpcUrl = localProvider.connection.url
+			return new Web3Provider(new BurnerProvider(burnerConfig))
+		} else {
+			// eslint-disable-next-line no-underscore-dangle
+			const networkName = localProvider._network && localProvider._network.name
+			burnerConfig.rpcUrl = `https://${
+				networkName || 'mainnet'
+			}.infura.io/v3/${INFURA_ID}`
+			return new Web3Provider(new BurnerProvider(burnerConfig))
+		}
+	}, [injectedProvider, localProvider])
+
 function tokenListToObject(array) {
 	return array.reduce((obj, item) => {
 		obj[item.symbol] = new Token(
@@ -49,7 +97,7 @@ const getTokenList = async (tokenListURI) => {
 		let _tokenList = [ethToken, ...filteredTokens]
 		return _tokenList
 	} catch (e) {
-		console.log(e)
+		console.error(e)
 	}
 }
 
@@ -57,14 +105,13 @@ const getTrades = async (
 	tokenIn,
 	tokenOut,
 	amountIn,
-	amountOut,
 	tokenList,
 	userProvider,
 	tokens,
 	setAmountOut,
 	setTrades
 ) => {
-	if (tokenIn && tokenOut && (amountIn || amountOut)) {
+	if (tokenIn && tokenOut && amountIn) {
 		let pairs = (arr) =>
 			arr.map((v, i) => arr.slice(i + 1).map((w) => [v, w])).flat()
 
@@ -93,7 +140,6 @@ const getTrades = async (
 			})
 
 		let listOfPairwiseTokens = pairs(baseTokens)
-
 		const getPairs = async (list) => {
 			let listOfPromises = list.map((item) =>
 				Fetcher.fetchPairData(item[0], item[1], userProvider)
@@ -111,7 +157,6 @@ const getTrades = async (
 			),
 			tokens[tokenOut]
 		)
-		console.log(bestTrade[0], bestTrade[0].outputAmount.toSignificant(6))
 		if (bestTrade[0]) {
 			setAmountOut(bestTrade[0].outputAmount.toSignificant(6))
 		} else {
@@ -123,6 +168,21 @@ const getTrades = async (
 }
 let defaultToken = 'ETH'
 let defaultTokenOut = 'DAI'
+export const ROUTER_ADDRESS = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+const makeCall = async (callName, contract, args, metadata = {}) => {
+	if (contract[callName]) {
+		let result
+		if (args) {
+			result = await contract[callName](...args, metadata)
+		} else {
+			result = await contract[callName]()
+		}
+		return result
+	} else {
+		console.log('no call of that name!')
+	}
+}
 
 function App() {
 	const [tokenListURI, setTokenListURI] = useState(
@@ -136,15 +196,21 @@ function App() {
 	const [amountIn, setAmountIn] = useState()
 	const [amountOut, setAmountOut] = useState()
 	const [trades, setTrades] = useState()
+	const [approving, setApproving] = useState(false)
+	const [balanceIn, setBalanceIn] = useState()
+	const [balanceOut, setBalanceOut] = useState()
+	const [routerAllowance, setRouterAllowance] = useState()
+	const [showNetworkWarning, setShowNetworkWarning] = useState(false)
+	const [injectedProvider, setInjectedProvider] = useState()
 
 	const localProviderUrl = 'http://localhost:8545'
 	const localProvider = new JsonRpcProvider(localProviderUrl)
+	const userProvider = useUserProvider(injectedProvider, localProvider)
 
 	async function loadBlockchainData() {
-		const web3 = new Web3('http://localhost:8545')
-		const accounts = await web3.eth.getAccounts()
+		const accounts = await userProvider.listAccounts()
+		console.log({ accounts })
 		const userAccount = accounts[0]
-		const userProvider = getProvider(localProvider)
 		const balance = await userProvider.getBalance(userAccount)
 		const etherBalance = formatEther(balance)
 		const _tokenList = await getTokenList(tokenListURI)
@@ -153,7 +219,113 @@ function App() {
 		setTokens(tokenListToObject(_tokenList))
 	}
 
-	console.log({ tokens })
+	let signer = userProvider.getSigner()
+
+	const loadWeb3Modal = useCallback(async () => {
+		const provider = await web3Modal.connect()
+		const newInjectedNetwork = async (chainId) => {
+			let localNetwork = await localProvider.getNetwork()
+			if (localNetwork.chainId == chainId) {
+				setShowNetworkWarning(false)
+				return true
+			} else {
+				setShowNetworkWarning(true)
+				return false
+			}
+		}
+
+		const newWeb3Provider = async () => {
+			let newWeb3Provider = new Web3Provider(provider)
+			let newNetwork = await newWeb3Provider.getNetwork()
+			newInjectedNetwork(newNetwork.chainId)
+			console.log('newNetwork', newNetwork, newWeb3Provider)
+			setInjectedProvider(newWeb3Provider)
+		}
+
+		newWeb3Provider()
+
+		provider.on('chainChanged', (chainId) => {
+			let knownNetwork = newInjectedNetwork(chainId)
+			if (knownNetwork) newWeb3Provider()
+		})
+
+		provider.on('accountsChanged', (accounts) => {
+			newWeb3Provider()
+		})
+	}, [setInjectedProvider])
+
+	useEffect(() => {
+		if (web3Modal.cachedProvider) {
+			loadWeb3Modal()
+		}
+	}, [loadWeb3Modal])
+
+	useEffect(() => {
+		loadBlockchainData()
+	}, [injectedProvider])
+
+	const getBalance = async (_token, _account, _contract) => {
+		let newBalance
+		if (_token === 'ETH') {
+			newBalance = await userProvider.getBalance(_account)
+		} else {
+			newBalance = await makeCall('balanceOf', _contract, [_account])
+		}
+		return newBalance
+	}
+
+	const getAccountInfo = async () => {
+		if (tokens) {
+			let accountList = await userProvider.listAccounts()
+			if (tokenIn) {
+				let tempContractIn = new ethers.Contract(
+					tokens[tokenIn].address,
+					erc20Abi,
+					userProvider
+				)
+				console.log(
+					'getBalance for token',
+					tempContractIn,
+					tokens[tokenIn].address,
+					accountList[0],
+					accountList
+				)
+				let newBalanceIn = await getBalance(
+					tokenIn,
+					accountList[0],
+					tempContractIn
+				)
+				setBalanceIn(newBalanceIn)
+
+				let allowance
+
+				if (tokenIn === 'ETH') {
+					setRouterAllowance()
+				} else {
+					allowance = await makeCall('allowance', tempContractIn, [
+						accountList[0],
+						ROUTER_ADDRESS
+					])
+					setRouterAllowance(allowance)
+				}
+			}
+
+			if (tokenOut) {
+				let tempContractOut = new ethers.Contract(
+					tokens[tokenOut].address,
+					erc20Abi,
+					userProvider
+				)
+				let newBalanceOut = await getBalance(
+					tokenOut,
+					accountList[0],
+					tempContractOut
+				)
+				setBalanceOut(newBalanceOut)
+			}
+		}
+	}
+
 	useEffect(() => {
 		loadBlockchainData()
 	}, [])
@@ -163,16 +335,56 @@ function App() {
 			tokenIn,
 			tokenOut,
 			amountIn,
-			amountOut,
 			tokenList,
-			getProvider(localProvider),
+			userProvider,
 			tokens,
 			setAmountOut,
 			setTrades
 		)
+		getAccountInfo()
 	}, [tokenIn, tokenOut, amountIn, amountOut])
 
-	console.log({ tokenIn })
+	let inputIsToken = tokenIn !== 'ETH'
+	let insufficientBalance = balanceIn
+		? parseFloat(formatUnits(balanceIn, tokens[tokenIn].decimals)) < amountIn
+		: null
+
+	const updateRouterAllowance = async (newAllowance) => {
+		setApproving(true)
+		try {
+			let tempContract = new ethers.Contract(
+				tokens[tokenIn].address,
+				erc20Abi,
+				signer
+			)
+			let result = await makeCall('approve', tempContract, [
+				ROUTER_ADDRESS,
+				newAllowance
+			])
+			setApproving(false)
+			return true
+		} catch (e) {
+			console.log({
+				message: 'Approval unsuccessful',
+				description: `Error: ${e.message}`
+			})
+		}
+	}
+
+	const approveRouter = async () => {
+		let approvalAmount = ethers.utils.hexlify(
+			parseUnits(amountIn.toString(), tokens[tokenIn].decimals)
+		)
+
+		let approval = updateRouterAllowance(approvalAmount)
+
+		console.log({
+			message: 'Token transfer approved',
+			description: `You can now swap up to ${amountIn} ${tokenIn}`
+		})
+	}
+	const swapping = false
+
 	return (
 		<div className='App'>
 			<Box
@@ -234,9 +446,42 @@ function App() {
 					</Select>
 					<Input type='number' placeholder={0} value={amountOut} />
 				</Box>
+				{inputIsToken ? (
+					<Button size='large' loading={approving} onClick={approveRouter}>
+						{approving ? (
+							<Spinner />
+						) : amountIn && amountOut ? (
+							'Approved'
+						) : (
+							'Approve'
+						)}
+					</Button>
+				) : null}
+				<Button size='lg'>
+					{swapping ? (
+						<Spinner />
+					) : insufficientBalance ? (
+						'Insufficient balance'
+					) : (
+						'Swap!'
+					)}
+				</Button>
 			</Box>
 		</div>
 	)
 }
+
+const web3Modal = new Web3Modal({
+	// network: "mainnet", // optional
+	cacheProvider: true, // optional
+	providerOptions: {
+		walletconnect: {
+			package: WalletConnectProvider, // required
+			options: {
+				infuraId: INFURA_ID
+			}
+		}
+	}
+})
 
 export default App
