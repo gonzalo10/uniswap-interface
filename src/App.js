@@ -19,6 +19,7 @@ import WalletConnectProvider from '@walletconnect/web3-provider'
 import { useEffect } from 'react'
 import { formatEther, formatUnits } from '@ethersproject/units'
 import { Box, Button, Heading, Input, Select, Spinner } from '@chakra-ui/react'
+import { abi as IUniswapV2Router02ABI } from '@uniswap/v2-periphery/build/IUniswapV2Router02.json'
 
 export const INFURA_ID = '460f40a260564ac4a4f4b3fffb032dad'
 
@@ -184,6 +185,9 @@ const makeCall = async (callName, contract, args, metadata = {}) => {
 	}
 }
 
+let defaultTimeLimit = 60 * 10
+let defaultSlippage = '0.5'
+
 function App() {
 	const [tokenListURI, setTokenListURI] = useState(
 		'https://gateway.ipfs.io/ipns/tokens.uniswap.org'
@@ -202,6 +206,12 @@ function App() {
 	const [routerAllowance, setRouterAllowance] = useState()
 	const [showNetworkWarning, setShowNetworkWarning] = useState(false)
 	const [injectedProvider, setInjectedProvider] = useState()
+	const [swapping, setSwapping] = useState(false)
+	const [timeLimit, setTimeLimit] = useState(defaultTimeLimit)
+	const [amountOutMin, setAmountOutMin] = useState()
+	const [slippageTolerance, setSlippageTolerance] = useState(
+		new Percent(Math.round(defaultSlippage * 100).toString(), '10000')
+	)
 
 	const localProviderUrl = 'http://localhost:8545'
 	const localProvider = new JsonRpcProvider(localProviderUrl)
@@ -218,8 +228,18 @@ function App() {
 		setTokenList(_tokenList)
 		setTokens(tokenListToObject(_tokenList))
 	}
+	useEffect(() => {
+		if (trades && trades[0]) {
+			setAmountOutMin(trades[0].minimumAmountOut(slippageTolerance))
+		}
+	}, [slippageTolerance, amountIn, amountOut, trades])
 
 	let signer = userProvider.getSigner()
+	let routerContract = new ethers.Contract(
+		ROUTER_ADDRESS,
+		IUniswapV2Router02ABI,
+		signer
+	)
 
 	const loadWeb3Modal = useCallback(async () => {
 		const provider = await web3Modal.connect()
@@ -326,6 +346,60 @@ function App() {
 		}
 	}
 
+	const executeSwap = async () => {
+		setSwapping(true)
+		try {
+			let args
+			let metadata = {}
+
+			let call
+			let deadline = Math.floor(Date.now() / 1000) + timeLimit
+			let path = trades[0].route.path.map(function (item) {
+				return item['address']
+			})
+			console.log(path)
+			let accountList = await userProvider.listAccounts()
+			let address = accountList[0]
+
+			let _amountIn = ethers.utils.hexlify(
+				parseUnits(amountIn.toString(), tokens[tokenIn].decimals)
+			)
+			let _amountOutMin = ethers.utils.hexlify(
+				ethers.BigNumber.from(amountOutMin.raw.toString())
+			)
+			if (tokenIn === 'ETH') {
+				call = 'swapExactETHForTokens'
+				args = [_amountOutMin, path, address, deadline]
+				metadata['value'] = _amountIn
+			} else {
+				call =
+					tokenOut === 'ETH'
+						? 'swapExactTokensForETH'
+						: 'swapExactTokensForTokens'
+				args = [_amountIn, _amountOutMin, path, address, deadline]
+			}
+
+			console.log(call, args, metadata)
+			let result = await makeCall(call, routerContract, args, metadata)
+			console.log(result)
+			console.log({
+				message: 'Swap complete 🦄',
+				description: {
+					text: `Swapped ${tokenIn} for ${tokenOut}, transaction: `,
+					text2: result.hash
+				}
+			})
+			setSwapping(false)
+		} catch (e) {
+			console.log(e)
+			setSwapping(false)
+			console.error({
+				message: 'Swap unsuccessful',
+				description: `Error: ${e.message}`
+			})
+		}
+	}
+
 	useEffect(() => {
 		loadBlockchainData()
 	}, [])
@@ -371,7 +445,12 @@ function App() {
 		}
 	}
 
+	const handleSwapClick = () => {
+		executeSwap()
+	}
+
 	const approveRouter = async () => {
+		console.log('approve')
 		let approvalAmount = ethers.utils.hexlify(
 			parseUnits(amountIn.toString(), tokens[tokenIn].decimals)
 		)
@@ -383,7 +462,6 @@ function App() {
 			description: `You can now swap up to ${amountIn} ${tokenIn}`
 		})
 	}
-	const swapping = false
 
 	return (
 		<div className='App'>
@@ -457,7 +535,7 @@ function App() {
 						)}
 					</Button>
 				) : null}
-				<Button size='lg'>
+				<Button size='lg' onClick={handleSwapClick}>
 					{swapping ? (
 						<Spinner />
 					) : insufficientBalance ? (
