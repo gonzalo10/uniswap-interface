@@ -58,7 +58,6 @@ function App() {
 
 	async function loadBlockchainData() {
 		const accounts = await userProvider.listAccounts()
-		console.log({ accounts })
 		const userAccount = accounts[0]
 		const balance = await userProvider.getBalance(userAccount)
 		const etherBalance = formatEther(balance)
@@ -92,7 +91,6 @@ function App() {
 			let newWeb3Provider = new Web3Provider(provider)
 			let newNetwork = await newWeb3Provider.getNetwork()
 			newInjectedNetwork(newNetwork.chainId)
-			console.log('newNetwork', newNetwork, newWeb3Provider)
 			setInjectedProvider(newWeb3Provider)
 		}
 
@@ -161,13 +159,7 @@ function App() {
 					erc20Abi,
 					userProvider
 				)
-				console.log(
-					'getBalance for token',
-					tempContractIn,
-					tokens[tokenIn].address,
-					accountList[0],
-					accountList
-				)
+
 				let newBalanceIn = await getBalance(
 					tokenIn,
 					accountList[0],
@@ -175,12 +167,10 @@ function App() {
 				)
 				setBalanceIn(newBalanceIn)
 
-				let allowance
-
 				if (tokenIn === 'ETH') {
 					setRouterAllowance()
 				} else {
-					allowance = await makeCall('allowance', tempContractIn, [
+					const allowance = await makeCall('allowance', tempContractIn, [
 						accountList[0],
 						ROUTER_ADDRESS
 					])
@@ -215,7 +205,6 @@ function App() {
 			let path = trades[0].route.path.map(function (item) {
 				return item['address']
 			})
-			console.log(path)
 			let accountList = await userProvider.listAccounts()
 			let address = accountList[0]
 
@@ -237,24 +226,15 @@ function App() {
 				args = [_amountIn, _amountOutMin, path, address, deadline]
 			}
 
-			console.log(call, args, metadata)
 			let result = await makeCall(call, routerContract, args, metadata)
-			console.log(result)
-			console.log({
-				message: 'Swap complete 🦄',
-				description: {
-					text: `Swapped ${tokenIn} for ${tokenOut}, transaction: `,
-					text2: result.hash
-				}
-			})
+			toast.success(`Swap complete 🦄!,Swapped ${tokenIn} for ${tokenOut}`)
+
+			console.log(`transaction: ${result.hash}`)
 			setSwapping(false)
 		} catch (e) {
-			console.log(e)
+			console.error()
 			setSwapping(false)
-			console.error({
-				message: 'Swap unsuccessful',
-				description: `Error: ${e.message}`
-			})
+			toast.error(`Swap unsuccessful!, Error: ${e.message} `)
 		}
 	}
 
@@ -271,41 +251,42 @@ function App() {
 				erc20Abi,
 				signer
 			)
-			let result = await makeCall('approve', tempContract, [
-				ROUTER_ADDRESS,
-				newAllowance
-			])
-
+			await makeCall('approve', tempContract, [ROUTER_ADDRESS, newAllowance])
 			return true
 		} catch (e) {
-			console.log({
-				message: 'Approval unsuccessful',
-				description: `Error: ${e.message}`
-			})
+			toast.error(`Approval unsuccessful!, Error: ${e.message} `)
 		} finally {
 			setApproving(false)
 		}
 	}
 
-	const handleSwapClick = () => {
-		executeSwap()
-	}
-
 	const approveRouter = async () => {
-		console.log('approve')
 		let approvalAmount = ethers.utils.hexlify(
 			parseUnits(amountIn.toString(), tokens[tokenIn].decimals)
 		)
-
 		const isApproved = updateRouterAllowance(approvalAmount)
 		if (isApproved) {
+			toast.success(
+				`Token transfer approved!, Swap up to ${amountIn} ${tokenIn}`
+			)
+		} else {
+			toast.error(`The token transfer was NOT approved!`)
 		}
-		toast.success(`Token transfer approved!, Swap up to ${amountIn} ${tokenIn}`)
 	}
 
 	return (
 		<div className='App'>
-			<Toaster position='top-right' reverseOrder={true} />
+			<Toaster
+				position='top-center'
+				reverseOrder={true}
+				toastOptions={{
+					className: '',
+					duration: 20000,
+					style: {
+						width: '100%'
+					}
+				}}
+			/>
 			<Box
 				d='flex'
 				alignItems='left'
@@ -376,7 +357,7 @@ function App() {
 						)}
 					</Button>
 				) : null}
-				<Button size='lg' onClick={handleSwapClick}>
+				<Button size='lg' onClick={executeSwap}>
 					{swapping ? (
 						<Spinner />
 					) : insufficientBalance ? (
