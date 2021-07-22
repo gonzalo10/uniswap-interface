@@ -27,10 +27,28 @@ import { useUserProvider } from './hooks'
 let defaultTimeLimit = 60 * 10
 let defaultSlippage = '0.5'
 
+const TOKEN_LIST_URI = 'https://gateway.ipfs.io/ipns/tokens.uniswap.org'
+
+async function loadBlockchainData(userProvider) {
+	const accounts = await userProvider.listAccounts()
+	const userAccount = accounts[0]
+	const balance = await userProvider.getBalance(userAccount)
+	const etherBalance = formatEther(balance)
+	const _tokenList = await getTokenList(TOKEN_LIST_URI)
+	return { userAccount, etherBalance, _tokenList }
+}
+
+const getBalance = async (userProvider, _token, _account, _contract) => {
+	let newBalance
+	if (_token === 'ETH') {
+		newBalance = await userProvider.getBalance(_account)
+	} else {
+		newBalance = await makeCall('balanceOf', _contract, [_account])
+	}
+	return newBalance
+}
+
 function App() {
-	const [tokenListURI, setTokenListURI] = useState(
-		'https://gateway.ipfs.io/ipns/tokens.uniswap.org'
-	)
 	const [tokenList, setTokenList] = useState()
 	const [tokens, setTokens] = useState()
 	const [userData, setUserData] = useState({})
@@ -41,7 +59,6 @@ function App() {
 	const [trades, setTrades] = useState()
 	const [approving, setApproving] = useState(false)
 	const [balanceIn, setBalanceIn] = useState()
-	const [balanceOut, setBalanceOut] = useState()
 	const [routerAllowance, setRouterAllowance] = useState()
 	const [showNetworkWarning, setShowNetworkWarning] = useState(false)
 	const [injectedProvider, setInjectedProvider] = useState()
@@ -56,12 +73,10 @@ function App() {
 	const localProvider = new JsonRpcProvider(localProviderUrl)
 	const userProvider = useUserProvider(injectedProvider, localProvider)
 
-	async function loadBlockchainData() {
-		const accounts = await userProvider.listAccounts()
-		const userAccount = accounts[0]
-		const balance = await userProvider.getBalance(userAccount)
-		const etherBalance = formatEther(balance)
-		const _tokenList = await getTokenList(tokenListURI)
+	async function loadData() {
+		const { userAccount, etherBalance, _tokenList } = await loadBlockchainData(
+			userProvider
+		)
 		setUserData({ address: userAccount, balance: parseFloat(etherBalance) })
 		setTokenList(_tokenList)
 		setTokens(tokenListToObject(_tokenList))
@@ -113,12 +128,8 @@ function App() {
 	}, [loadWeb3Modal])
 
 	useEffect(() => {
-		loadBlockchainData()
+		loadData()
 	}, [injectedProvider])
-
-	useEffect(() => {
-		loadBlockchainData()
-	}, [])
 
 	useEffect(() => {
 		getTrades(
@@ -140,16 +151,6 @@ function App() {
 		}
 	}, [slippageTolerance, amountIn, amountOut, trades])
 
-	const getBalance = async (_token, _account, _contract) => {
-		let newBalance
-		if (_token === 'ETH') {
-			newBalance = await userProvider.getBalance(_account)
-		} else {
-			newBalance = await makeCall('balanceOf', _contract, [_account])
-		}
-		return newBalance
-	}
-
 	const getAccountInfo = async () => {
 		if (tokens) {
 			let accountList = await userProvider.listAccounts()
@@ -161,35 +162,12 @@ function App() {
 				)
 
 				let newBalanceIn = await getBalance(
+					userProvider,
 					tokenIn,
 					accountList[0],
 					tempContractIn
 				)
 				setBalanceIn(newBalanceIn)
-
-				if (tokenIn === 'ETH') {
-					setRouterAllowance()
-				} else {
-					const allowance = await makeCall('allowance', tempContractIn, [
-						accountList[0],
-						ROUTER_ADDRESS
-					])
-					setRouterAllowance(allowance)
-				}
-			}
-
-			if (tokenOut) {
-				let tempContractOut = new ethers.Contract(
-					tokens[tokenOut].address,
-					erc20Abi,
-					userProvider
-				)
-				let newBalanceOut = await getBalance(
-					tokenOut,
-					accountList[0],
-					tempContractOut
-				)
-				setBalanceOut(newBalanceOut)
 			}
 		}
 	}
@@ -201,17 +179,17 @@ function App() {
 			let metadata = {}
 
 			let call
-			let deadline = Math.floor(Date.now() / 1000) + timeLimit
-			let path = trades[0].route.path.map(function (item) {
+			const deadline = Math.floor(Date.now() / 1000) + timeLimit
+			const path = trades[0].route.path.map(function (item) {
 				return item['address']
 			})
-			let accountList = await userProvider.listAccounts()
-			let address = accountList[0]
+			const accountList = await userProvider.listAccounts()
+			const address = accountList[0]
 
-			let _amountIn = ethers.utils.hexlify(
+			const _amountIn = ethers.utils.hexlify(
 				parseUnits(amountIn.toString(), tokens[tokenIn].decimals)
 			)
-			let _amountOutMin = ethers.utils.hexlify(
+			const _amountOutMin = ethers.utils.hexlify(
 				ethers.BigNumber.from(amountOutMin.raw.toString())
 			)
 			if (tokenIn === 'ETH') {
@@ -226,9 +204,8 @@ function App() {
 				args = [_amountIn, _amountOutMin, path, address, deadline]
 			}
 
-			let result = await makeCall(call, routerContract, args, metadata)
-			toast.success(`Swap complete 🦄!,Swapped ${tokenIn} for ${tokenOut}`)
-
+			const result = await makeCall(call, routerContract, args, metadata)
+			toast.success(`Swap complete 🦄!`)
 			console.log(`transaction: ${result.hash}`)
 			setSwapping(false)
 		} catch (e) {
