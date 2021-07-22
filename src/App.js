@@ -5,6 +5,7 @@ import { Percent } from '@uniswap/sdk'
 import Web3Modal from 'web3modal'
 import { ethers } from 'ethers'
 import WalletConnectProvider from '@walletconnect/web3-provider'
+import toast, { Toaster } from 'react-hot-toast'
 
 import { useEffect } from 'react'
 import { formatEther, formatUnits } from '@ethersproject/units'
@@ -274,13 +275,15 @@ function App() {
 				ROUTER_ADDRESS,
 				newAllowance
 			])
-			setApproving(false)
+
 			return true
 		} catch (e) {
 			console.log({
 				message: 'Approval unsuccessful',
 				description: `Error: ${e.message}`
 			})
+		} finally {
+			setApproving(false)
 		}
 	}
 
@@ -294,16 +297,15 @@ function App() {
 			parseUnits(amountIn.toString(), tokens[tokenIn].decimals)
 		)
 
-		let approval = updateRouterAllowance(approvalAmount)
-
-		console.log({
-			message: 'Token transfer approved',
-			description: `You can now swap up to ${amountIn} ${tokenIn}`
-		})
+		const isApproved = updateRouterAllowance(approvalAmount)
+		if (isApproved) {
+		}
+		toast.success(`Token transfer approved!, Swap up to ${amountIn} ${tokenIn}`)
 	}
 
 	return (
 		<div className='App'>
+			<Toaster position='top-right' reverseOrder={true} />
 			<Box
 				d='flex'
 				alignItems='left'
