@@ -1,13 +1,6 @@
-import { parseUnits } from '@ethersproject/units'
+import { formatEther, parseUnits } from '@ethersproject/units'
 import { ChainId, Token, WETH, Fetcher, Trade, TokenAmount } from '@uniswap/sdk'
-
-export const INFURA_ID = '460f40a260564ac4a4f4b3fffb032dad'
-
-export const erc20Abi = [
-	'function balanceOf(address owner) view returns (uint256)',
-	'function approve(address _spender, uint256 _value) public returns (bool success)',
-	'function allowance(address _owner, address _spender) public view returns (uint256 remaining)'
-]
+import { TOKEN_LIST_URI } from './constants'
 
 export function tokenListToObject(array) {
 	return array.reduce((obj, item) => {
@@ -121,4 +114,13 @@ export const makeCall = async (callName, contract, args, metadata = {}) => {
 	} else {
 		console.log('no call of that name!')
 	}
+}
+
+export async function loadBlockchainData(userProvider) {
+	const accounts = await userProvider.listAccounts()
+	const userAccount = accounts[0]
+	const balance = await userProvider.getBalance(userAccount)
+	const etherBalance = formatEther(balance)
+	const _tokenList = await getTokenList(TOKEN_LIST_URI)
+	return { userAccount, etherBalance, _tokenList }
 }

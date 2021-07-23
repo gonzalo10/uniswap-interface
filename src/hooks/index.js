@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 
 import { Web3Provider } from '@ethersproject/providers'
 import BurnerProvider from 'burner-provider'
-import { INFURA_ID } from './helpers'
+import { INFURA_ID } from '../helpers/constants'
 
 export const useUserProvider = (injectedProvider, localProvider) =>
 	useMemo(() => {
