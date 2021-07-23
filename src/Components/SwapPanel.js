@@ -23,7 +23,7 @@ const slippageTolerance = new Percent(
 	'10000'
 )
 
-const SwapPanel = ({ tokenList, userProvider, tokens, routerContract }) => {
+const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 	const [tokenIn, setTokenIn] = useState(defaultToken)
 	const [tokenOut, setTokenOut] = useState(defaultTokenOut)
 	const [amountIn, setAmountIn] = useState()
@@ -42,9 +42,9 @@ const SwapPanel = ({ tokenList, userProvider, tokens, routerContract }) => {
 			tokenIn,
 			tokenOut,
 			amountIn,
-			tokenList,
+			tokenData.list,
 			userProvider,
-			tokens,
+			tokenData.tokens,
 			setAmountOut,
 			setTrades
 		)
@@ -58,11 +58,11 @@ const SwapPanel = ({ tokenList, userProvider, tokens, routerContract }) => {
 	}, [slippageTolerance, amountIn, amountOut, trades])
 
 	const getAccountInfo = async () => {
-		if (tokens) {
+		if (tokenData.tokens) {
 			let accountList = await userProvider.listAccounts()
 			if (tokenIn) {
 				let tempContractIn = new ethers.Contract(
-					tokens[tokenIn].address,
+					tokenData.tokens[tokenIn].address,
 					erc20Abi,
 					userProvider
 				)
@@ -79,7 +79,11 @@ const SwapPanel = ({ tokenList, userProvider, tokens, routerContract }) => {
 	}
 
 	function getTempAddress() {
-		return new ethers.Contract(tokens[tokenIn].address, erc20Abi, signer)
+		return new ethers.Contract(
+			tokenData.tokens[tokenIn].address,
+			erc20Abi,
+			signer
+		)
 	}
 
 	async function updateRouterAllowance(newAllowance) {
@@ -99,7 +103,7 @@ const SwapPanel = ({ tokenList, userProvider, tokens, routerContract }) => {
 
 	async function approvedNewToken() {
 		let approvalAmount = ethers.utils.hexlify(
-			parseUnits(amountIn.toString(), tokens[tokenIn].decimals)
+			parseUnits(amountIn.toString(), tokenData.tokens[tokenIn].decimals)
 		)
 		const isApproved = updateRouterAllowance(approvalAmount)
 		if (isApproved) {
@@ -126,7 +130,7 @@ const SwapPanel = ({ tokenList, userProvider, tokens, routerContract }) => {
 			const address = accountList[0]
 
 			const _amountIn = ethers.utils.hexlify(
-				parseUnits(amountIn.toString(), tokens[tokenIn].decimals)
+				parseUnits(amountIn.toString(), tokenData.tokens[tokenIn].decimals)
 			)
 			const _amountOutMin = ethers.utils.hexlify(
 				ethers.BigNumber.from(amountOutMin.raw.toString())
@@ -156,7 +160,7 @@ const SwapPanel = ({ tokenList, userProvider, tokens, routerContract }) => {
 
 	const insufficientBalance = getInsufficientBalance(
 		balanceIn,
-		tokens,
+		tokenData.tokens,
 		tokenIn,
 		amountIn
 	)
@@ -177,7 +181,7 @@ const SwapPanel = ({ tokenList, userProvider, tokens, routerContract }) => {
 						onChange={(e) => {
 							setTokenIn(e.target.value)
 						}}>
-						{tokenList?.map((token) => (
+						{tokenData?.list?.map((token) => (
 							<option value={token.symbol} key={token.symbol}>
 								{token.symbol}
 							</option>
@@ -205,7 +209,7 @@ const SwapPanel = ({ tokenList, userProvider, tokens, routerContract }) => {
 						onChange={(e) => {
 							setTokenOut(e.target.value)
 						}}>
-						{tokenList?.map((token) => (
+						{tokenData?.list?.map((token) => (
 							<option value={token.symbol} key={token.symbol}>
 								{token.symbol}
 							</option>

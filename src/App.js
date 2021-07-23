@@ -15,23 +15,27 @@ const localProviderUrl = 'http://localhost:8545'
 const localProvider = new JsonRpcProvider(localProviderUrl)
 
 function App() {
-	const [tokenList, setTokenList] = useState()
-	const [tokens, setTokens] = useState()
+	const [tokenData, setTokenData] = useState({})
 	const [userData, setUserData] = useState({})
-	const [contractData, setContractData] = useState({})
 	const [showNetworkWarning, setShowNetworkWarning] = useState(false)
 	const [injectedProvider, setInjectedProvider] = useState()
 
 	const userProvider = useUserProvider(injectedProvider, localProvider)
 
-	const loadData = useCallback(async () => {
-		const { userAccount, etherBalance, tokenList, routerContract } =
-			await loadBlockchainData(userProvider)
+	const loadAppBlockchainData = useCallback(async () => {
+		const {
+			userAccount: address,
+			etherBalance,
+			tokenList,
+			routerContract
+		} = await loadBlockchainData(userProvider)
 
-		setUserData({ address: userAccount, balance: parseFloat(etherBalance) })
-		setContractData({ routerContract })
-		setTokenList(tokenList)
-		setTokens(tokenListToObject(tokenList))
+		setUserData({
+			address,
+			balance: parseFloat(etherBalance),
+			routerContract
+		})
+		setTokenData({ list: tokenList, tokens: tokenListToObject(tokenList) })
 	}, [userProvider])
 
 	const isCorrectNetwork = useCallback(async (chainId) => {
@@ -65,8 +69,8 @@ function App() {
 	}, [loadWeb3Modal])
 
 	useEffect(() => {
-		loadData()
-	}, [injectedProvider, loadData])
+		loadAppBlockchainData()
+	}, [injectedProvider, loadAppBlockchainData])
 
 	return (
 		<>
@@ -95,10 +99,9 @@ function App() {
 				<Box>User Balance: {userData.balance} ETH</Box>
 			</Box>
 			<SwapPanel
-				tokenList={tokenList}
+				tokenData={tokenData}
 				userProvider={userProvider}
-				tokens={tokens}
-				routerContract={contractData.routerContract}
+				routerContract={userData.routerContract}
 			/>
 		</>
 	)

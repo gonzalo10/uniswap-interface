@@ -129,7 +129,7 @@ export async function loadBlockchainData(userProvider) {
 	const balance = await userProvider.getBalance(userAccount)
 	const etherBalance = formatEther(balance)
 	const tokenList = await getTokenList(TOKEN_LIST_URI)
-	let signer = userProvider.getSigner()
+	const signer = userProvider.getSigner()
 	const routerContract = getRouterContract(signer)
 
 	return { userAccount, etherBalance, tokenList, routerContract }
