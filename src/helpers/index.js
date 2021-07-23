@@ -1,6 +1,8 @@
 import { formatEther, parseUnits } from '@ethersproject/units'
 import { ChainId, Token, WETH, Fetcher, Trade, TokenAmount } from '@uniswap/sdk'
 import { TOKEN_LIST_URI } from './constants'
+import { abi as IUniswapV2Router02ABI } from '@uniswap/v2-periphery/build/IUniswapV2Router02.json'
+import { ethers } from 'ethers'
 
 export function tokenListToObject(array) {
 	return array.reduce((obj, item) => {
@@ -26,7 +28,8 @@ export const getTokenList = async (tokenListURI) => {
 		ethToken.symbol = 'ETH'
 		ethToken.logoURI =
 			'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png'
-		let _tokenList = [ethToken, ...filteredTokens]
+		const _tokenList = [ethToken, ...filteredTokens]
+		console.log({ _tokenList })
 		return _tokenList
 	} catch (e) {
 		console.error(e)
@@ -116,11 +119,18 @@ export const makeCall = async (callName, contract, args, metadata = {}) => {
 	}
 }
 
+function getRouterContract(signer) {
+	return new ethers.Contract(ROUTER_ADDRESS, IUniswapV2Router02ABI, signer)
+}
+
 export async function loadBlockchainData(userProvider) {
 	const accounts = await userProvider.listAccounts()
 	const userAccount = accounts[0]
 	const balance = await userProvider.getBalance(userAccount)
 	const etherBalance = formatEther(balance)
-	const _tokenList = await getTokenList(TOKEN_LIST_URI)
-	return { userAccount, etherBalance, _tokenList }
+	const tokenList = await getTokenList(TOKEN_LIST_URI)
+	let signer = userProvider.getSigner()
+	const routerContract = getRouterContract(signer)
+
+	return { userAccount, etherBalance, tokenList, routerContract }
 }

@@ -5,9 +5,7 @@ import { ethers } from 'ethers'
 import toast from 'react-hot-toast'
 
 import { useEffect } from 'react'
-import { formatUnits } from '@ethersproject/units'
 import { Box, Button, Heading, Input, Select, Spinner } from '@chakra-ui/react'
-import { abi as IUniswapV2Router02ABI } from '@uniswap/v2-periphery/build/IUniswapV2Router02.json'
 import {
 	defaultToken,
 	defaultTokenOut,
@@ -16,6 +14,7 @@ import {
 	ROUTER_ADDRESS
 } from '../helpers'
 import { erc20Abi } from '../helpers/constants'
+import { getBalance, getInsufficientBalance } from './helpers'
 
 const timeLimit = 60 * 10
 const defaultSlippage = '0.5'
@@ -24,25 +23,7 @@ const slippageTolerance = new Percent(
 	'10000'
 )
 
-const getBalance = async (userProvider, _token, _account, _contract) => {
-	let newBalance
-	if (_token === 'ETH') {
-		newBalance = await userProvider.getBalance(_account)
-	} else {
-		newBalance = await makeCall('balanceOf', _contract, [_account])
-	}
-	return newBalance
-}
-
-function getInsufficientBalance(balanceIn, tokens, tokenIn, amountIn) {
-	if (balanceIn)
-		return (
-			parseFloat(formatUnits(balanceIn, tokens[tokenIn].decimals)) < amountIn
-		)
-	return null
-}
-
-const SwapPanel = ({ tokenList, userProvider, tokens }) => {
+const SwapPanel = ({ tokenList, userProvider, tokens, routerContract }) => {
 	const [tokenIn, setTokenIn] = useState(defaultToken)
 	const [tokenOut, setTokenOut] = useState(defaultTokenOut)
 	const [amountIn, setAmountIn] = useState()
@@ -55,12 +36,6 @@ const SwapPanel = ({ tokenList, userProvider, tokens }) => {
 	const [balanceIn, setBalanceIn] = useState()
 
 	let signer = userProvider.getSigner()
-
-	let routerContract = new ethers.Contract(
-		ROUTER_ADDRESS,
-		IUniswapV2Router02ABI,
-		signer
-	)
 
 	useEffect(() => {
 		getTrades(
@@ -103,15 +78,17 @@ const SwapPanel = ({ tokenList, userProvider, tokens }) => {
 		}
 	}
 
-	const updateRouterAllowance = async (newAllowance) => {
+	function getTempAddress() {
+		return new ethers.Contract(tokens[tokenIn].address, erc20Abi, signer)
+	}
+
+	async function updateRouterAllowance(newAllowance) {
 		setApproving(true)
 		try {
-			let tempContract = new ethers.Contract(
-				tokens[tokenIn].address,
-				erc20Abi,
-				signer
-			)
-			await makeCall('approve', tempContract, [ROUTER_ADDRESS, newAllowance])
+			await makeCall('approve', getTempAddress(), [
+				ROUTER_ADDRESS,
+				newAllowance
+			])
 			return true
 		} catch (e) {
 			toast.error(`Approval unsuccessful!, Error: ${e.message} `)
@@ -120,7 +97,7 @@ const SwapPanel = ({ tokenList, userProvider, tokens }) => {
 		}
 	}
 
-	const approveRouter = async () => {
+	async function approvedNewToken() {
 		let approvalAmount = ethers.utils.hexlify(
 			parseUnits(amountIn.toString(), tokens[tokenIn].decimals)
 		)
@@ -133,7 +110,7 @@ const SwapPanel = ({ tokenList, userProvider, tokens }) => {
 			toast.error(`The token transfer was NOT approved!`)
 		}
 	}
-
+	// needs refactor
 	const executeSwap = async () => {
 		setSwapping(true)
 		try {
@@ -237,7 +214,7 @@ const SwapPanel = ({ tokenList, userProvider, tokens }) => {
 					<Input type='number' placeholder={0} value={amountOut} />
 				</Box>
 				{inputIsToken ? (
-					<Button size='large' loading={approving} onClick={approveRouter}>
+					<Button size='large' loading={approving} onClick={approvedNewToken}>
 						{approving ? (
 							<Spinner />
 						) : amountIn && amountOut ? (

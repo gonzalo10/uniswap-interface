@@ -11,58 +11,52 @@ import { useUserProvider } from './hooks'
 import SwapPanel from './Components/SwapPanel'
 import { INFURA_ID } from './helpers/constants'
 
+const localProviderUrl = 'http://localhost:8545'
+const localProvider = new JsonRpcProvider(localProviderUrl)
+
 function App() {
 	const [tokenList, setTokenList] = useState()
 	const [tokens, setTokens] = useState()
 	const [userData, setUserData] = useState({})
-
-	const [, setShowNetworkWarning] = useState(false)
+	const [contractData, setContractData] = useState({})
+	const [showNetworkWarning, setShowNetworkWarning] = useState(false)
 	const [injectedProvider, setInjectedProvider] = useState()
 
-	const localProviderUrl = 'http://localhost:8545'
-	const localProvider = new JsonRpcProvider(localProviderUrl)
 	const userProvider = useUserProvider(injectedProvider, localProvider)
 
-	async function loadData() {
-		const { userAccount, etherBalance, _tokenList } = await loadBlockchainData(
-			userProvider
-		)
+	const loadData = useCallback(async () => {
+		const { userAccount, etherBalance, tokenList, routerContract } =
+			await loadBlockchainData(userProvider)
+
 		setUserData({ address: userAccount, balance: parseFloat(etherBalance) })
-		setTokenList(_tokenList)
-		setTokens(tokenListToObject(_tokenList))
+		setContractData({ routerContract })
+		setTokenList(tokenList)
+		setTokens(tokenListToObject(tokenList))
+	}, [userProvider])
+
+	const isCorrectNetwork = useCallback(async (chainId) => {
+		let localNetwork = await localProvider.getNetwork()
+		return localNetwork.chainId === chainId
+	}, [])
+
+	const getNewWeb3Provider = async (provider) => {
+		let newWeb3Provider = new Web3Provider(provider)
+		let newNetwork = await newWeb3Provider.getNetwork()
+		return { chainId: newNetwork.chainId, newWeb3Provider }
 	}
 
 	const loadWeb3Modal = useCallback(async () => {
 		const provider = await web3Modal.connect()
-		const newInjectedNetwork = async (chainId) => {
-			let localNetwork = await localProvider.getNetwork()
-			if (localNetwork.chainId == chainId) {
-				setShowNetworkWarning(false)
-				return true
-			} else {
-				setShowNetworkWarning(true)
-				return false
-			}
-		}
-
-		const newWeb3Provider = async () => {
-			let newWeb3Provider = new Web3Provider(provider)
-			let newNetwork = await newWeb3Provider.getNetwork()
-			newInjectedNetwork(newNetwork.chainId)
-			setInjectedProvider(newWeb3Provider)
-		}
-
-		newWeb3Provider()
-
+		const { chainId, newWeb3Provider } = await getNewWeb3Provider(provider)
+		setShowNetworkWarning(!isCorrectNetwork(chainId))
+		setInjectedProvider(newWeb3Provider)
 		provider.on('chainChanged', (chainId) => {
-			let knownNetwork = newInjectedNetwork(chainId)
-			if (knownNetwork) newWeb3Provider()
+			if (isCorrectNetwork(chainId)) newWeb3Provider()
 		})
-
-		provider.on('accountsChanged', (accounts) => {
+		provider.on('accountsChanged', () => {
 			newWeb3Provider()
 		})
-	}, [setInjectedProvider])
+	}, [isCorrectNetwork])
 
 	useEffect(() => {
 		if (web3Modal.cachedProvider) {
@@ -72,10 +66,13 @@ function App() {
 
 	useEffect(() => {
 		loadData()
-	}, [injectedProvider])
+	}, [injectedProvider, loadData])
 
 	return (
-		<div className='App'>
+		<>
+			{showNetworkWarning && (
+				<span>{`Your wallet is not corrected to the right network, please connect to the network at ${localProviderUrl}`}</span>
+			)}
 			<Toaster
 				position='top-center'
 				reverseOrder={true}
@@ -101,8 +98,9 @@ function App() {
 				tokenList={tokenList}
 				userProvider={userProvider}
 				tokens={tokens}
+				routerContract={contractData.routerContract}
 			/>
-		</div>
+		</>
 	)
 }
 
