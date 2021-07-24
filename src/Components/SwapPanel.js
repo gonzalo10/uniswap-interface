@@ -5,7 +5,7 @@ import { ethers } from 'ethers'
 import toast from 'react-hot-toast'
 
 import { useEffect } from 'react'
-import { Box, Button, Heading, Input, Select, Spinner } from '@chakra-ui/react'
+import { Box, Button, Input, Select, Spinner } from '@chakra-ui/react'
 import {
 	defaultToken,
 	defaultTokenOut,
@@ -15,6 +15,7 @@ import {
 } from '../helpers'
 import { erc20Abi } from '../helpers/constants'
 import { getBalance, getInsufficientBalance } from './helpers'
+import ArrowIcon from '../assets/arrow-icon'
 
 const timeLimit = 60 * 10
 const defaultSlippage = '0.5'
@@ -22,6 +23,104 @@ const slippageTolerance = new Percent(
 	Math.round(defaultSlippage * 100).toString(),
 	'10000'
 )
+
+const SwapInInput = ({
+	tokenIn,
+	setTokenIn,
+	tokenData,
+	amountIn,
+	setAmountIn
+}) => {
+	console.log({ amountIn })
+	return (
+		<Box>
+			<Select
+				value={tokenIn}
+				placeholder='Tokens Selection'
+				variant='outline'
+				w='auto'
+				onChange={(e) => {
+					setTokenIn(e.target.value)
+				}}>
+				{tokenData?.list?.map((token) => (
+					<option value={token.symbol} key={token.symbol}>
+						{token.symbol}
+					</option>
+				))}
+			</Select>
+			<Input
+				value={amountIn || ''}
+				type='number'
+				onChange={(e) => {
+					setAmountIn(e.target.value)
+				}}
+			/>
+		</Box>
+	)
+}
+
+const SwapOutInput = ({ setTokenOut, amountOut, tokenData, tokenOut }) => {
+	return (
+		<Box>
+			<Select
+				placeholder='Tokens Selection'
+				variant='outline'
+				w='auto'
+				value={tokenOut}
+				onChange={(e) => {
+					setTokenOut(e.target.value)
+				}}>
+				{tokenData?.list?.map((token) => (
+					<option value={token.symbol} key={token.symbol}>
+						{token.symbol}
+					</option>
+				))}
+			</Select>
+			<Input readOnly type='number' placeholder={0} value={amountOut || ''} />
+		</Box>
+	)
+}
+
+const SwapButton = ({
+	inputIsToken,
+	approving,
+	approvedNewToken,
+	amountIn,
+	amountOut,
+	swapping,
+	executeSwap,
+	insufficientBalance
+}) => {
+	if (inputIsToken) {
+		return (
+			<Button size='large' loading={approving} onClick={approvedNewToken}>
+				{approving ? (
+					<Spinner />
+				) : amountIn && amountOut ? (
+					'Approved'
+				) : (
+					'Approve'
+				)}
+			</Button>
+		)
+	}
+	return (
+		<Button
+			size='lg'
+			onClick={executeSwap}
+			ml='1rem'
+			bg='#ff9800'
+			color='white'>
+			{swapping ? (
+				<Spinner />
+			) : insufficientBalance ? (
+				'Insufficient balance'
+			) : (
+				'Swap!'
+			)}
+		</Button>
+	)
+}
 
 const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 	const [tokenIn, setTokenIn] = useState(defaultToken)
@@ -114,6 +213,7 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 			toast.error(`The token transfer was NOT approved!`)
 		}
 	}
+
 	// needs refactor
 	const executeSwap = async () => {
 		setSwapping(true)
@@ -168,77 +268,39 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 	let inputIsToken = tokenIn !== 'ETH'
 
 	return (
-		<>
-			<Box d='flex' flexDir='row' alignItems='center' justifyContent='center'>
-				<Heading whiteSpace='nowrap'>Token In</Heading>
-				<Box>
-					<Select
-						value={tokenIn}
-						placeholder='Tokens Selection'
-						variant='outline'
-						w='auto'
-						defaultValue={defaultToken}
-						onChange={(e) => {
-							setTokenIn(e.target.value)
-						}}>
-						{tokenData?.list?.map((token) => (
-							<option value={token.symbol} key={token.symbol}>
-								{token.symbol}
-							</option>
-						))}
-					</Select>
-					<Input
-						value={amountIn || 0}
-						type='number'
-						placeholder={0}
-						onChange={(e) => {
-							setAmountIn(e.target.value)
-						}}
-					/>
-				</Box>
+		<Box
+			d='flex'
+			flexDir='row'
+			alignItems='center'
+			justifyContent='center'
+			h='80%'>
+			<SwapInInput
+				tokenIn={tokenIn}
+				setTokenIn={setTokenIn}
+				tokenData={tokenData}
+				amountIn={amountIn}
+				setAmountIn={setAmountIn}
+			/>
+			<Box mx='1.5rem'>
+				<ArrowIcon />
 			</Box>
-
-			<Box d='flex' flexDir='row' alignItems='center' justifyContent='center'>
-				<Heading whiteSpace='nowrap'>Token Out</Heading>
-				<Box>
-					<Select
-						placeholder='Tokens Selection'
-						variant='outline'
-						w='auto'
-						value={tokenOut}
-						onChange={(e) => {
-							setTokenOut(e.target.value)
-						}}>
-						{tokenData?.list?.map((token) => (
-							<option value={token.symbol} key={token.symbol}>
-								{token.symbol}
-							</option>
-						))}
-					</Select>
-					<Input type='number' placeholder={0} value={amountOut} />
-				</Box>
-				{inputIsToken ? (
-					<Button size='large' loading={approving} onClick={approvedNewToken}>
-						{approving ? (
-							<Spinner />
-						) : amountIn && amountOut ? (
-							'Approved'
-						) : (
-							'Approve'
-						)}
-					</Button>
-				) : null}
-				<Button size='lg' onClick={executeSwap}>
-					{swapping ? (
-						<Spinner />
-					) : insufficientBalance ? (
-						'Insufficient balance'
-					) : (
-						'Swap!'
-					)}
-				</Button>
-			</Box>
-		</>
+			<SwapOutInput
+				setTokenOut={setTokenOut}
+				amountOut={amountOut}
+				tokenData={tokenData}
+				tokenOut={tokenOut}
+			/>
+			<SwapButton
+				inputIsToken={inputIsToken}
+				approving={approving}
+				approvedNewToken={approvedNewToken}
+				amountIn={amountIn}
+				amountOut={amountOut}
+				swapping={swapping}
+				executeSwap={executeSwap}
+				insufficientBalance={insufficientBalance}
+			/>
+		</Box>
 	)
 }
 

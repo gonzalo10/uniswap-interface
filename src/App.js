@@ -73,7 +73,7 @@ function App() {
 	}, [injectedProvider, loadAppBlockchainData])
 
 	return (
-		<>
+		<Box h='100vh'>
 			{showNetworkWarning && (
 				<span>{`Your wallet is not corrected to the right network, please connect to the network at ${localProviderUrl}`}</span>
 			)}
@@ -103,7 +103,7 @@ function App() {
 				userProvider={userProvider}
 				routerContract={userData.routerContract}
 			/>
-		</>
+		</Box>
 	)
 }
 
