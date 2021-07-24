@@ -5,7 +5,7 @@ import { abi as IUniswapV2Router02ABI } from '@uniswap/v2-periphery/build/IUnisw
 import { ethers } from 'ethers'
 
 export function tokenListToObject(array) {
-	return array.reduce((obj, item) => {
+	return array?.reduce((obj, item) => {
 		obj[item.symbol] = new Token(
 			item.chainId,
 			item.address,

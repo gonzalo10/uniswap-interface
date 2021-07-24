@@ -69,7 +69,7 @@ function App() {
 	}, [loadWeb3Modal])
 
 	useEffect(() => {
-		loadAppBlockchainData()
+		injectedProvider && loadAppBlockchainData()
 	}, [injectedProvider, loadAppBlockchainData])
 
 	return (

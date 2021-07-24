@@ -36,6 +36,7 @@ const TokensDropdown = ({ tokenData, selectToken, selectedToken }) => {
 			<MenuList height='40vh' overflow='scroll'>
 				{tokenData?.list?.map((listItem) => (
 					<MenuItem
+						key={listItem?.symbol}
 						minH='48px'
 						id={listItem?.symbol}
 						onClick={(e) => {

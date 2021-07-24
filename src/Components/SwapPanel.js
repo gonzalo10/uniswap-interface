@@ -4,7 +4,7 @@ import { ethers } from 'ethers'
 import toast from 'react-hot-toast'
 
 import { useEffect } from 'react'
-import { Box } from '@chakra-ui/react'
+import { Box, Spinner } from '@chakra-ui/react'
 import { getTrades, makeCall } from '../helpers'
 import {
 	defaultToken,
@@ -23,6 +23,10 @@ import ArrowIcon from '../assets/arrow-icon'
 import usePoller from '../hooks/usePoller'
 import { SwapInInput, SwapOutInput } from './SwapInput'
 import SwapButton from './SwapButton'
+
+function hasTokenData(tokenData) {
+	return tokenData?.list?.length > 0
+}
 
 const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 	const [tokenIn, setTokenIn] = useState(defaultToken)
@@ -215,7 +219,20 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 		amountIn,
 		inputIsToken
 	)
-
+	if (!hasTokenData(tokenData))
+		return (
+			<Box
+				mt='10vh'
+				d='flex'
+				justifyContent='center'
+				alignItems='center'
+				flexDir='column'>
+				<Spinner />
+				<Box mt='1rem' as='span'>
+					Loading Uniswap Token List
+				</Box>
+			</Box>
+		)
 	return (
 		<Box
 			d='flex'
