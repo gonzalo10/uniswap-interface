@@ -41,7 +41,7 @@ const slippageTolerance = new Percent(
 const TokensDropdown = ({ tokenData, selectToken, selectedToken }) => {
 	const token = tokenData?.list?.find((item) => item?.symbol === selectedToken)
 	return (
-		<Menu>
+		<Menu preventOverflow strategy='absolute' boundary='scrollParent'>
 			<MenuButton
 				as={Button}
 				rightIcon={<ChevronDownIcon />}
@@ -60,7 +60,7 @@ const TokensDropdown = ({ tokenData, selectToken, selectedToken }) => {
 					<Text color='black'>{token?.symbol}</Text>
 				</Box>
 			</MenuButton>
-			<MenuList>
+			<MenuList height='40vh' overflow='scroll'>
 				{tokenData?.list?.map((listItem) => (
 					<MenuItem
 						minH='48px'
@@ -96,13 +96,17 @@ const SwapInInput = ({
 			p='2rem'
 			border='1px solid'
 			borderColor='brand.500'
-			borderRadius='1rem'>
+			borderRadius='1rem'
+			d='flex'
+			flexDir='column'
+			alignItems='flex-start'>
 			<TokensDropdown
 				selectedToken={tokenIn}
 				selectToken={setTokenIn}
 				tokenData={tokenData}
 			/>
 			<Input
+				w='200px'
 				mt='2rem'
 				value={amountIn || ''}
 				type='number'
@@ -122,7 +126,10 @@ const SwapOutInput = ({ setTokenOut, amountOut, tokenData, tokenOut }) => {
 			p='2rem'
 			border='1px solid'
 			borderColor='brand.500'
-			borderRadius='1rem'>
+			borderRadius='1rem'
+			d='flex'
+			flexDir='column'
+			alignItems='flex-start'>
 			<TokensDropdown
 				selectedToken={tokenOut}
 				selectToken={setTokenOut}
@@ -151,7 +158,12 @@ const SwapButton = ({
 }) => {
 	if (inputIsToken) {
 		return (
-			<Button size='large' loading={approving} onClick={approvedNewToken}>
+			<Button
+				size='lg'
+				loading={approving}
+				onClick={approvedNewToken}
+				colorScheme='brand'
+				fontSize='xl'>
 				{approving ? (
 					<Spinner />
 				) : amountIn && amountOut ? (
@@ -163,7 +175,12 @@ const SwapButton = ({
 		)
 	}
 	return (
-		<Button size='lg' onClick={executeSwap} ml='1rem' colorScheme='brand'>
+		<Button
+			size='lg'
+			onClick={executeSwap}
+			colorScheme='brand'
+			fontSize='xl'
+			w='100%'>
 			{swapping ? (
 				<Spinner />
 			) : insufficientBalance ? (
@@ -323,36 +340,47 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 	return (
 		<Box
 			d='flex'
-			flexDir='row'
+			flexDir='column'
 			alignItems='center'
 			justifyContent='center'
-			h='80%'>
-			<SwapInInput
-				tokenIn={tokenIn}
-				setTokenIn={setTokenIn}
-				tokenData={tokenData}
-				amountIn={amountIn}
-				setAmountIn={setAmountIn}
-			/>
-			<Box mx='1.5rem'>
-				<ArrowIcon />
+			mt='20vh'
+			mx='auto'
+			w='fit-content'>
+			<Box
+				d='flex'
+				flexDir='row'
+				alignItems='center'
+				justifyContent='center'
+				h='80%'>
+				<SwapInInput
+					tokenIn={tokenIn}
+					setTokenIn={setTokenIn}
+					tokenData={tokenData}
+					amountIn={amountIn}
+					setAmountIn={setAmountIn}
+				/>
+				<Box mx='1.5rem'>
+					<ArrowIcon />
+				</Box>
+				<SwapOutInput
+					setTokenOut={setTokenOut}
+					amountOut={amountOut}
+					tokenData={tokenData}
+					tokenOut={tokenOut}
+				/>
 			</Box>
-			<SwapOutInput
-				setTokenOut={setTokenOut}
-				amountOut={amountOut}
-				tokenData={tokenData}
-				tokenOut={tokenOut}
-			/>
-			<SwapButton
-				inputIsToken={inputIsToken}
-				approving={approving}
-				approvedNewToken={approvedNewToken}
-				amountIn={amountIn}
-				amountOut={amountOut}
-				swapping={swapping}
-				executeSwap={executeSwap}
-				insufficientBalance={insufficientBalance}
-			/>
+			<Box mt='2rem' w='100%'>
+				<SwapButton
+					inputIsToken={inputIsToken}
+					approving={approving}
+					approvedNewToken={approvedNewToken}
+					amountIn={amountIn}
+					amountOut={amountOut}
+					swapping={swapping}
+					executeSwap={executeSwap}
+					insufficientBalance={insufficientBalance}
+				/>
+			</Box>
 		</Box>
 	)
 }
