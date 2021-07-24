@@ -30,6 +30,7 @@ import {
 import { erc20Abi } from '../helpers/constants'
 import { getBalance, getInsufficientBalance } from './helpers'
 import ArrowIcon from '../assets/arrow-icon'
+import usePoller from '../hooks/usePoller'
 
 const timeLimit = 60 * 10
 const defaultSlippage = '0.5'
@@ -156,7 +157,6 @@ const SwapButton = ({
 	insufficientBalance,
 	insufficientAllowance
 }) => {
-	console.log({ insufficientAllowance, insufficientBalance })
 	if (inputIsToken && insufficientAllowance) {
 		return (
 			<Button
@@ -296,6 +296,8 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 		}
 	}
 
+	usePoller(getAccountInfo, 6000)
+
 	// needs refactor
 	const executeSwap = async () => {
 		setSwapping(true)
@@ -355,13 +357,6 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 				formatUnits(routerAllowance, tokenData.tokens[tokenIn].decimals)
 		  ) < amountIn
 		: null
-
-	console.log(
-		'routerAllowance',
-		routerAllowance &&
-			!inputIsToken &&
-			formatUnits(routerAllowance, tokenData?.tokens?.[tokenIn]?.decimals)
-	)
 
 	return (
 		<Box
