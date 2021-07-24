@@ -1,6 +1,6 @@
 import { formatEther, parseUnits } from '@ethersproject/units'
 import { ChainId, Token, WETH, Fetcher, Trade, TokenAmount } from '@uniswap/sdk'
-import { TOKEN_LIST_URI } from './constants'
+import { ROUTER_ADDRESS, TOKEN_LIST_URI } from './constants'
 import { abi as IUniswapV2Router02ABI } from '@uniswap/v2-periphery/build/IUniswapV2Router02.json'
 import { ethers } from 'ethers'
 
@@ -100,9 +100,6 @@ export const getTrades = async (
 		setTrades(bestTrade)
 	}
 }
-export const defaultToken = 'ETH'
-export const defaultTokenOut = 'DAI'
-export const ROUTER_ADDRESS = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
 
 export const makeCall = async (callName, contract, args, metadata = {}) => {
 	if (contract[callName]) {

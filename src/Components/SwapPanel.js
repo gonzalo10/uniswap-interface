@@ -1,19 +1,19 @@
 import { useState } from 'react'
 import { parseUnits } from '@ethersproject/units'
-import { Percent } from '@uniswap/sdk'
 import { ethers } from 'ethers'
 import toast from 'react-hot-toast'
 
 import { useEffect } from 'react'
 import { Box } from '@chakra-ui/react'
+import { getTrades, makeCall } from '../helpers'
 import {
 	defaultToken,
 	defaultTokenOut,
-	getTrades,
-	makeCall,
-	ROUTER_ADDRESS
-} from '../helpers'
-import { erc20Abi } from '../helpers/constants'
+	erc20Abi,
+	ROUTER_ADDRESS,
+	slippageTolerance,
+	timeLimit
+} from '../helpers/constants'
 import {
 	getBalance,
 	getInsufficientAllowance,
@@ -23,13 +23,6 @@ import ArrowIcon from '../assets/arrow-icon'
 import usePoller from '../hooks/usePoller'
 import { SwapInInput, SwapOutInput } from './SwapInput'
 import SwapButton from './SwapButton'
-
-const timeLimit = 60 * 10
-const defaultSlippage = '0.5'
-const slippageTolerance = new Percent(
-	Math.round(defaultSlippage * 100).toString(),
-	'10000'
-)
 
 const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 	const [tokenIn, setTokenIn] = useState(defaultToken)
