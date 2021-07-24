@@ -105,12 +105,7 @@ const SwapButton = ({
 		)
 	}
 	return (
-		<Button
-			size='lg'
-			onClick={executeSwap}
-			ml='1rem'
-			bg='#ff9800'
-			color='white'>
+		<Button size='lg' onClick={executeSwap} ml='1rem' colorScheme='brand'>
 			{swapping ? (
 				<Spinner />
 			) : insufficientBalance ? (
