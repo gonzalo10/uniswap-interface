@@ -156,8 +156,8 @@ const SwapButton = ({
 	insufficientBalance,
 	insufficientAllowance
 }) => {
-	console.log({ insufficientBalance })
-	if (inputIsToken) {
+	console.log({ insufficientAllowance, insufficientBalance })
+	if (inputIsToken && insufficientAllowance) {
 		return (
 			<Button
 				size='lg'
@@ -244,6 +244,17 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 					tempContractIn
 				)
 				setBalanceIn(newBalanceIn)
+				let allowance
+
+				if (tokenIn === 'ETH') {
+					setRouterAllowance()
+				} else {
+					allowance = await makeCall('allowance', tempContractIn, [
+						accountList[0],
+						ROUTER_ADDRESS
+					])
+					setRouterAllowance(allowance)
+				}
 			}
 		}
 	}
@@ -337,12 +348,6 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 		tokenIn,
 		amountIn
 	)
-	console.log(
-		'routerAllowance',
-		routerAllowance &&
-			!inputIsToken &&
-			formatUnits(routerAllowance, tokenData?.tokens?.[tokenIn]?.decimals)
-	)
 	let insufficientAllowance = !inputIsToken
 		? false
 		: routerAllowance
@@ -350,6 +355,13 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 				formatUnits(routerAllowance, tokenData.tokens[tokenIn].decimals)
 		  ) < amountIn
 		: null
+
+	console.log(
+		'routerAllowance',
+		routerAllowance &&
+			!inputIsToken &&
+			formatUnits(routerAllowance, tokenData?.tokens?.[tokenIn]?.decimals)
+	)
 
 	return (
 		<Box

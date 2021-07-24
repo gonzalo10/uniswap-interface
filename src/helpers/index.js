@@ -93,7 +93,7 @@ export const getTrades = async (
 			tokens[tokenOut]
 		)
 		if (bestTrade[0]) {
-			setAmountOut(bestTrade[0].outputAmount.toSignificant(6))
+			setAmountOut(bestTrade[0]?.outputAmount?.toSignificant(6))
 		} else {
 			setAmountOut()
 		}
