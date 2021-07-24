@@ -5,7 +5,7 @@ import WalletConnectProvider from '@walletconnect/web3-provider'
 import { Toaster } from 'react-hot-toast'
 
 import { useEffect } from 'react'
-import { Box } from '@chakra-ui/react'
+import { Box, Img } from '@chakra-ui/react'
 import { loadBlockchainData, tokenListToObject } from './helpers'
 import { useUserProvider } from './hooks'
 import SwapPanel from './Components/SwapPanel'
@@ -73,7 +73,7 @@ function App() {
 	}, [injectedProvider, loadAppBlockchainData])
 
 	return (
-		<Box h='100vh'>
+		<Box h='100vh' bg='brand.50'>
 			{showNetworkWarning && (
 				<span>{`Your wallet is not corrected to the right network, please connect to the network at ${localProviderUrl}`}</span>
 			)}
@@ -88,6 +88,7 @@ function App() {
 					}
 				}}
 			/>
+			<img src='/img/logo.png' alt='' width='100px' height='100px' />
 			<Box
 				d='flex'
 				alignItems='left'

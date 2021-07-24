@@ -3,9 +3,23 @@ import { parseUnits } from '@ethersproject/units'
 import { Percent } from '@uniswap/sdk'
 import { ethers } from 'ethers'
 import toast from 'react-hot-toast'
+import { ChevronDownIcon } from '@chakra-ui/icons'
 
 import { useEffect } from 'react'
-import { Box, Button, Input, Select, Spinner } from '@chakra-ui/react'
+import {
+	Box,
+	Button,
+	Image,
+	Input,
+	Menu,
+	MenuButton,
+	MenuItem,
+	MenuList,
+	MenuOptionGroup,
+	Select,
+	Spinner,
+	Text
+} from '@chakra-ui/react'
 import {
 	defaultToken,
 	defaultTokenOut,
@@ -24,6 +38,51 @@ const slippageTolerance = new Percent(
 	'10000'
 )
 
+const TokensDropdown = ({ tokenData, selectToken, selectedToken }) => {
+	const token = tokenData?.list?.find((item) => item?.symbol === selectedToken)
+	return (
+		<Menu>
+			<MenuButton
+				as={Button}
+				rightIcon={<ChevronDownIcon />}
+				size='xl'
+				colorScheme='brand'
+				variant='ghost'
+				p='0.5rem'>
+				<Box d='flex' alignItems='center'>
+					<Image
+						boxSize='2rem'
+						borderRadius='full'
+						src={token?.logoURI}
+						alt={''}
+						mr='1rem'
+					/>
+					<Text color='black'>{token?.symbol}</Text>
+				</Box>
+			</MenuButton>
+			<MenuList>
+				{tokenData?.list?.map((listItem) => (
+					<MenuItem
+						minH='48px'
+						id={listItem?.symbol}
+						onClick={(e) => {
+							selectToken(listItem?.symbol)
+						}}>
+						<Image
+							boxSize='2rem'
+							borderRadius='full'
+							src={listItem?.logoURI}
+							alt={listItem?.name}
+							mr='12px'
+						/>
+						<span>{listItem?.symbol}</span>
+					</MenuItem>
+				))}
+			</MenuList>
+		</Menu>
+	)
+}
+
 const SwapInInput = ({
 	tokenIn,
 	setTokenIn,
@@ -31,24 +90,20 @@ const SwapInInput = ({
 	amountIn,
 	setAmountIn
 }) => {
-	console.log({ amountIn })
 	return (
-		<Box>
-			<Select
-				value={tokenIn}
-				placeholder='Tokens Selection'
-				variant='outline'
-				w='auto'
-				onChange={(e) => {
-					setTokenIn(e.target.value)
-				}}>
-				{tokenData?.list?.map((token) => (
-					<option value={token.symbol} key={token.symbol}>
-						{token.symbol}
-					</option>
-				))}
-			</Select>
+		<Box
+			bg='white'
+			p='2rem'
+			border='1px solid'
+			borderColor='brand.500'
+			borderRadius='1rem'>
+			<TokensDropdown
+				selectedToken={tokenIn}
+				selectToken={setTokenIn}
+				tokenData={tokenData}
+			/>
 			<Input
+				mt='2rem'
 				value={amountIn || ''}
 				type='number'
 				onChange={(e) => {
@@ -60,23 +115,26 @@ const SwapInInput = ({
 }
 
 const SwapOutInput = ({ setTokenOut, amountOut, tokenData, tokenOut }) => {
+	console.log('tokenData?.list', tokenData?.list)
 	return (
-		<Box>
-			<Select
-				placeholder='Tokens Selection'
-				variant='outline'
-				w='auto'
-				value={tokenOut}
-				onChange={(e) => {
-					setTokenOut(e.target.value)
-				}}>
-				{tokenData?.list?.map((token) => (
-					<option value={token.symbol} key={token.symbol}>
-						{token.symbol}
-					</option>
-				))}
-			</Select>
-			<Input readOnly type='number' placeholder={0} value={amountOut || ''} />
+		<Box
+			bg='white'
+			p='2rem'
+			border='1px solid'
+			borderColor='brand.500'
+			borderRadius='1rem'>
+			<TokensDropdown
+				selectedToken={tokenOut}
+				selectToken={setTokenOut}
+				tokenData={tokenData}
+			/>
+			<Input
+				readOnly
+				type='number'
+				mt='2rem'
+				placeholder={0}
+				value={amountOut || ''}
+			/>
 		</Box>
 	)
 }
