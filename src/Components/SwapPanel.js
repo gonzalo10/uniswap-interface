@@ -3,23 +3,9 @@ import { formatUnits, parseUnits } from '@ethersproject/units'
 import { Percent } from '@uniswap/sdk'
 import { ethers } from 'ethers'
 import toast from 'react-hot-toast'
-import { ChevronDownIcon } from '@chakra-ui/icons'
 
 import { useEffect } from 'react'
-import {
-	Box,
-	Button,
-	Image,
-	Input,
-	Menu,
-	MenuButton,
-	MenuItem,
-	MenuList,
-	MenuOptionGroup,
-	Select,
-	Spinner,
-	Text
-} from '@chakra-ui/react'
+import { Box } from '@chakra-ui/react'
 import {
 	defaultToken,
 	defaultTokenOut,
@@ -31,6 +17,8 @@ import { erc20Abi } from '../helpers/constants'
 import { getBalance, getInsufficientBalance } from './helpers'
 import ArrowIcon from '../assets/arrow-icon'
 import usePoller from '../hooks/usePoller'
+import { SwapInInput, SwapOutInput } from './SwapInput'
+import SwapButton from './SwapButton'
 
 const timeLimit = 60 * 10
 const defaultSlippage = '0.5'
@@ -38,160 +26,6 @@ const slippageTolerance = new Percent(
 	Math.round(defaultSlippage * 100).toString(),
 	'10000'
 )
-
-const TokensDropdown = ({ tokenData, selectToken, selectedToken }) => {
-	const token = tokenData?.list?.find((item) => item?.symbol === selectedToken)
-	return (
-		<Menu preventOverflow strategy='absolute' boundary='scrollParent'>
-			<MenuButton
-				as={Button}
-				rightIcon={<ChevronDownIcon />}
-				size='xl'
-				colorScheme='brand'
-				variant='ghost'
-				p='0.5rem'>
-				<Box d='flex' alignItems='center'>
-					<Image
-						boxSize='2rem'
-						borderRadius='full'
-						src={token?.logoURI}
-						alt={''}
-						mr='1rem'
-					/>
-					<Text color='black'>{token?.symbol}</Text>
-				</Box>
-			</MenuButton>
-			<MenuList height='40vh' overflow='scroll'>
-				{tokenData?.list?.map((listItem) => (
-					<MenuItem
-						minH='48px'
-						id={listItem?.symbol}
-						onClick={(e) => {
-							selectToken(listItem?.symbol)
-						}}>
-						<Image
-							boxSize='2rem'
-							borderRadius='full'
-							src={listItem?.logoURI}
-							alt={listItem?.name}
-							mr='12px'
-						/>
-						<span>{listItem?.symbol}</span>
-					</MenuItem>
-				))}
-			</MenuList>
-		</Menu>
-	)
-}
-
-const SwapInInput = ({
-	tokenIn,
-	setTokenIn,
-	tokenData,
-	amountIn,
-	setAmountIn
-}) => {
-	return (
-		<Box
-			bg='white'
-			p='2rem'
-			border='1px solid'
-			borderColor='brand.500'
-			borderRadius='1rem'
-			d='flex'
-			flexDir='column'
-			alignItems='flex-start'>
-			<TokensDropdown
-				selectedToken={tokenIn}
-				selectToken={setTokenIn}
-				tokenData={tokenData}
-			/>
-			<Input
-				w='200px'
-				mt='2rem'
-				value={amountIn || ''}
-				type='number'
-				onChange={(e) => {
-					setAmountIn(+e.target.value)
-				}}
-			/>
-		</Box>
-	)
-}
-
-const SwapOutInput = ({ setTokenOut, amountOut, tokenData, tokenOut }) => {
-	return (
-		<Box
-			bg='white'
-			p='2rem'
-			border='1px solid'
-			borderColor='brand.500'
-			borderRadius='1rem'
-			d='flex'
-			flexDir='column'
-			alignItems='flex-start'>
-			<TokensDropdown
-				selectedToken={tokenOut}
-				selectToken={setTokenOut}
-				tokenData={tokenData}
-			/>
-			<Input
-				readOnly
-				type='number'
-				mt='2rem'
-				placeholder={0}
-				value={amountOut || ''}
-			/>
-		</Box>
-	)
-}
-
-const SwapButton = ({
-	inputIsToken,
-	approving,
-	approvedNewToken,
-	amountIn,
-	amountOut,
-	swapping,
-	executeSwap,
-	insufficientBalance,
-	insufficientAllowance
-}) => {
-	if (inputIsToken && insufficientAllowance) {
-		return (
-			<Button
-				size='lg'
-				onClick={approvedNewToken}
-				disabled={!insufficientAllowance}
-				colorScheme='brand'
-				fontSize='xl'
-				w='100%'>
-				{!insufficientAllowance && amountIn && amountOut
-					? '✅ Approved'
-					: 'Approve'}
-			</Button>
-		)
-	}
-	return (
-		<Button
-			size='lg'
-			onClick={executeSwap}
-			colorScheme='brand'
-			fontSize='xl'
-			disabled={
-				insufficientAllowance || insufficientBalance || !amountIn || !amountOut
-			}
-			w='100%'>
-			{swapping ? (
-				<Spinner />
-			) : insufficientBalance ? (
-				'Insufficient balance'
-			) : (
-				'Swap!'
-			)}
-		</Button>
-	)
-}
 
 const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 	const [tokenIn, setTokenIn] = useState(defaultToken)
