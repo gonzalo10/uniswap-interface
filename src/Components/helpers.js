@@ -18,3 +18,21 @@ export function getInsufficientBalance(balanceIn, tokens, tokenIn, amountIn) {
 		)
 	return null
 }
+
+export function getInsufficientAllowance(
+	routerAllowance,
+	tokenData,
+	tokenIn,
+	amountIn,
+	inputIsToken
+) {
+	if (!inputIsToken) return false
+	if (routerAllowance) {
+		return (
+			parseFloat(
+				formatUnits(routerAllowance, tokenData.tokens[tokenIn].decimals)
+			) < amountIn
+		)
+	}
+	return null
+}

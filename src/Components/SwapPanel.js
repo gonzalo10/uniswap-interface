@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { formatUnits, parseUnits } from '@ethersproject/units'
+import { parseUnits } from '@ethersproject/units'
 import { Percent } from '@uniswap/sdk'
 import { ethers } from 'ethers'
 import toast from 'react-hot-toast'
@@ -14,7 +14,11 @@ import {
 	ROUTER_ADDRESS
 } from '../helpers'
 import { erc20Abi } from '../helpers/constants'
-import { getBalance, getInsufficientBalance } from './helpers'
+import {
+	getBalance,
+	getInsufficientAllowance,
+	getInsufficientBalance
+} from './helpers'
 import ArrowIcon from '../assets/arrow-icon'
 import usePoller from '../hooks/usePoller'
 import { SwapInInput, SwapOutInput } from './SwapInput'
@@ -53,28 +57,35 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 			setTrades
 		)
 		getAccountInfo()
-	}, [tokenIn, tokenOut, amountIn, amountOut])
+	}, [
+		tokenIn,
+		tokenOut,
+		amountIn,
+		amountOut,
+		tokenData.list,
+		tokenData.tokens,
+		userProvider
+	])
 
 	useEffect(() => {
 		if (trades && trades[0]) {
 			setAmountOutMin(trades[0].minimumAmountOut(slippageTolerance))
 		}
-	}, [slippageTolerance, amountIn, amountOut, trades])
+	}, [amountIn, amountOut, trades])
 
 	const getAccountInfo = async () => {
 		if (tokenData.tokens) {
-			let accountList = await userProvider.listAccounts()
+			const address = await getUserAddress()
 			if (tokenIn) {
 				let tempContractIn = new ethers.Contract(
 					tokenData.tokens[tokenIn].address,
 					erc20Abi,
 					userProvider
 				)
-
 				let newBalanceIn = await getBalance(
 					userProvider,
 					tokenIn,
-					accountList[0],
+					address,
 					tempContractIn
 				)
 				setBalanceIn(newBalanceIn)
@@ -84,7 +95,7 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 					setRouterAllowance()
 				} else {
 					allowance = await makeCall('allowance', tempContractIn, [
-						accountList[0],
+						address,
 						ROUTER_ADDRESS
 					])
 					setRouterAllowance(allowance)
@@ -99,6 +110,11 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 			erc20Abi,
 			signer
 		)
+	}
+
+	async function getUserAddress() {
+		let accountList = await userProvider.listAccounts()
+		return accountList[0]
 	}
 
 	async function updateRouterAllowance(newAllowance) {
@@ -132,45 +148,60 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 
 	usePoller(getAccountInfo, 6000)
 
-	// needs refactor
+	function getCall(tokenIn, tokenOut) {
+		if (tokenIn === 'ETH') {
+			return 'swapExactETHForTokens'
+		} else {
+			if (tokenOut === 'ETH') {
+				return 'swapExactTokensForETH'
+			}
+			return 'swapExactTokensForTokens'
+		}
+	}
+
+	function getAmountOutMin() {
+		return ethers.utils.hexlify(
+			ethers.BigNumber.from(amountOutMin.raw.toString())
+		)
+	}
+	function getAmountIn() {
+		return ethers.utils.hexlify(
+			parseUnits(amountIn.toString(), tokenData.tokens[tokenIn].decimals)
+		)
+	}
+
+	function getArgs(path, address, deadline) {
+		let metadata = {}
+		const _amountOutMin = getAmountOutMin()
+		const _amountIn = getAmountIn()
+		if (tokenIn === 'ETH') {
+			const args = [_amountOutMin, path, address, deadline]
+			metadata['value'] = _amountIn
+			return { args, metadata }
+		} else {
+			const args = [_amountIn, _amountOutMin, path, address, deadline]
+			return { args, metadata }
+		}
+	}
+
+	function getPath(trades) {
+		return trades[0].route.path.map(function (item) {
+			return item['address']
+		})
+	}
+
 	const executeSwap = async () => {
 		setSwapping(true)
 		try {
-			let args
-			let metadata = {}
-
-			let call
+			const call = getCall(tokenIn, tokenOut)
 			const deadline = Math.floor(Date.now() / 1000) + timeLimit
-			const path = trades[0].route.path.map(function (item) {
-				return item['address']
-			})
-			const accountList = await userProvider.listAccounts()
-			const address = accountList[0]
-
-			const _amountIn = ethers.utils.hexlify(
-				parseUnits(amountIn.toString(), tokenData.tokens[tokenIn].decimals)
-			)
-			const _amountOutMin = ethers.utils.hexlify(
-				ethers.BigNumber.from(amountOutMin.raw.toString())
-			)
-			if (tokenIn === 'ETH') {
-				call = 'swapExactETHForTokens'
-				args = [_amountOutMin, path, address, deadline]
-				metadata['value'] = _amountIn
-			} else {
-				call =
-					tokenOut === 'ETH'
-						? 'swapExactTokensForETH'
-						: 'swapExactTokensForTokens'
-				args = [_amountIn, _amountOutMin, path, address, deadline]
-			}
-
-			const result = await makeCall(call, routerContract, args, metadata)
+			const path = getPath(trades)
+			const address = await getUserAddress()
+			const { args, metadata } = getArgs(path, address, deadline)
+			await makeCall(call, routerContract, args, metadata)
 			toast.success(`Swap complete 🦄!`)
-			console.log(`transaction: ${result.hash}`)
 			setSwapping(false)
 		} catch (e) {
-			console.error()
 			setSwapping(false)
 			toast.error(`Swap unsuccessful!, Error: ${e.message} `)
 		}
@@ -184,13 +215,13 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 		tokenIn,
 		amountIn
 	)
-	let insufficientAllowance = !inputIsToken
-		? false
-		: routerAllowance
-		? parseFloat(
-				formatUnits(routerAllowance, tokenData.tokens[tokenIn].decimals)
-		  ) < amountIn
-		: null
+	let insufficientAllowance = getInsufficientAllowance(
+		routerAllowance,
+		tokenData,
+		tokenIn,
+		amountIn,
+		inputIsToken
+	)
 
 	return (
 		<Box
