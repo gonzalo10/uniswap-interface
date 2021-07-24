@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { parseUnits } from '@ethersproject/units'
+import { formatUnits, parseUnits } from '@ethersproject/units'
 import { Percent } from '@uniswap/sdk'
 import { ethers } from 'ethers'
 import toast from 'react-hot-toast'
@@ -111,7 +111,7 @@ const SwapInInput = ({
 				value={amountIn || ''}
 				type='number'
 				onChange={(e) => {
-					setAmountIn(e.target.value)
+					setAmountIn(+e.target.value)
 				}}
 			/>
 		</Box>
@@ -119,7 +119,6 @@ const SwapInInput = ({
 }
 
 const SwapOutInput = ({ setTokenOut, amountOut, tokenData, tokenOut }) => {
-	console.log('tokenData?.list', tokenData?.list)
 	return (
 		<Box
 			bg='white'
@@ -154,23 +153,22 @@ const SwapButton = ({
 	amountOut,
 	swapping,
 	executeSwap,
-	insufficientBalance
+	insufficientBalance,
+	insufficientAllowance
 }) => {
+	console.log({ insufficientBalance })
 	if (inputIsToken) {
 		return (
 			<Button
 				size='lg'
-				loading={approving}
 				onClick={approvedNewToken}
+				disabled={!insufficientAllowance}
 				colorScheme='brand'
-				fontSize='xl'>
-				{approving ? (
-					<Spinner />
-				) : amountIn && amountOut ? (
-					'Approved'
-				) : (
-					'Approve'
-				)}
+				fontSize='xl'
+				w='100%'>
+				{!insufficientAllowance && amountIn && amountOut
+					? '✅ Approved'
+					: 'Approve'}
 			</Button>
 		)
 	}
@@ -180,6 +178,9 @@ const SwapButton = ({
 			onClick={executeSwap}
 			colorScheme='brand'
 			fontSize='xl'
+			disabled={
+				insufficientAllowance || insufficientBalance || !amountIn || !amountOut
+			}
 			w='100%'>
 			{swapping ? (
 				<Spinner />
@@ -274,7 +275,7 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 		let approvalAmount = ethers.utils.hexlify(
 			parseUnits(amountIn.toString(), tokenData.tokens[tokenIn].decimals)
 		)
-		const isApproved = updateRouterAllowance(approvalAmount)
+		const isApproved = await updateRouterAllowance(approvalAmount)
 		if (isApproved) {
 			toast.success(
 				`Token transfer approved!, Swap up to ${amountIn} ${tokenIn}`
@@ -328,14 +329,27 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 		}
 	}
 
+	let inputIsToken = tokenIn !== 'ETH'
+
 	const insufficientBalance = getInsufficientBalance(
 		balanceIn,
 		tokenData.tokens,
 		tokenIn,
 		amountIn
 	)
-
-	let inputIsToken = tokenIn !== 'ETH'
+	console.log(
+		'routerAllowance',
+		routerAllowance &&
+			!inputIsToken &&
+			formatUnits(routerAllowance, tokenData?.tokens?.[tokenIn]?.decimals)
+	)
+	let insufficientAllowance = !inputIsToken
+		? false
+		: routerAllowance
+		? parseFloat(
+				formatUnits(routerAllowance, tokenData.tokens[tokenIn].decimals)
+		  ) < amountIn
+		: null
 
 	return (
 		<Box
@@ -373,6 +387,7 @@ const SwapPanel = ({ tokenData, userProvider, routerContract }) => {
 				<SwapButton
 					inputIsToken={inputIsToken}
 					approving={approving}
+					insufficientAllowance={insufficientAllowance}
 					approvedNewToken={approvedNewToken}
 					amountIn={amountIn}
 					amountOut={amountOut}

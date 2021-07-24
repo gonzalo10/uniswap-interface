@@ -14,7 +14,7 @@ export const getBalance = async (userProvider, token, account, contract) => {
 export function getInsufficientBalance(balanceIn, tokens, tokenIn, amountIn) {
 	if (balanceIn)
 		return (
-			parseFloat(formatUnits(balanceIn, tokens[tokenIn].decimals)) < amountIn
+			parseFloat(formatUnits(balanceIn, tokens[tokenIn].decimals)) < +amountIn
 		)
 	return null
 }
