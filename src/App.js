@@ -39,6 +39,7 @@ function App() {
 	}, [userProvider])
 
 	const isCorrectNetwork = useCallback(async (chainId) => {
+		if (!chainId) return false
 		let localNetwork = await localProvider.getNetwork()
 		return localNetwork.chainId === chainId
 	}, [])
@@ -46,19 +47,24 @@ function App() {
 	const getNewWeb3Provider = async (provider) => {
 		let newWeb3Provider = new Web3Provider(provider)
 		let newNetwork = await newWeb3Provider.getNetwork()
+		console.log({ newWeb3Provider })
 		return { chainId: newNetwork.chainId, newWeb3Provider }
+	}
+
+	async function updateAccount(provider) {
+		const { chainId, newWeb3Provider } = await getNewWeb3Provider(provider)
+		setShowNetworkWarning(!isCorrectNetwork(chainId))
+		setInjectedProvider(newWeb3Provider)
 	}
 
 	const loadWeb3Modal = useCallback(async () => {
 		const provider = await web3Modal.connect()
-		const { chainId, newWeb3Provider } = await getNewWeb3Provider(provider)
-		setShowNetworkWarning(!isCorrectNetwork(chainId))
-		setInjectedProvider(newWeb3Provider)
-		provider.on('chainChanged', (chainId) => {
-			if (isCorrectNetwork(chainId)) newWeb3Provider()
+		updateAccount(provider)
+		provider?.on('chainChanged', (chainId) => {
+			if (isCorrectNetwork(chainId)) updateAccount(provider)
 		})
-		provider.on('accountsChanged', () => {
-			newWeb3Provider()
+		provider?.on('accountsChanged', () => {
+			updateAccount(provider)
 		})
 	}, [isCorrectNetwork])
 
